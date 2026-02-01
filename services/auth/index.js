@@ -2,10 +2,10 @@ require("dotenv").config();
 const http = require("http");
 const app = require("./app");
 const { sequelize } = require('./models');
+const { verifyCloudinary } = require('./config/cloudinary'); 
 
 const port = process.env.PORT || 3000;
 
-//Only create and listen to the server if running locally
 if (require.main === module) {
   const server = http.Server(app);
 
@@ -13,6 +13,13 @@ if (require.main === module) {
     try {
       await sequelize.authenticate();
       console.log('Connection to PostgreSQL has been established successfully.');
+
+      const isCloudinaryReady = await verifyCloudinary();
+      if (isCloudinaryReady) {
+        console.log('Cloudinary configuration is valid.');
+      } else {
+        console.log('Cloudinary is not configured correctly. Uploads will fail.');
+      }
 
       server.listen(port, () => {
         console.log(`App is listening on port ${port}`);
@@ -52,5 +59,4 @@ if (require.main === module) {
   startServer();
 }
 
-//Always export app for Vercel
 module.exports = app;

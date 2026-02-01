@@ -10,36 +10,20 @@ const globalErrorHandler = require("./controllers/error/errorController");
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ limit: '5mb', extended: false }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-const {upload}= require('./utils/multer');
-
-const {uploadFile} = require('./utils/aws')
-
-app.get("/test",(req,res)=>{
+app.get("/",(req,res)=>{
   res.send("Server is running changes")
 })
 
-// authenticate.unless = unless;
-// app.use(authenticate.unless(authenticateRoutes));
+authenticate.unless = unless;
+app.use(authenticate.unless(authenticateRoutes));
 
 app.use(require('./middlewares/paginate').paginate)
 
 app.use(routes);
 
-app.post('/upload-file',upload.single('file'),async(req,res)=>{
-
-  try{
-
-    const data = await uploadFile(req.file)
-
-    res.status(200).json(data);
-
-  }catch(err){
-    console.log("error : ",err)
-  }
-})
 
 app.all("*", (req, res, next) => {
   const err = new CustomError(

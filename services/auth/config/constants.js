@@ -5,7 +5,7 @@ module.exports = {
       UNAUTHORIZED: 401,
       NOT_FOUND: 404,
       CONFLICT: 409,
-      REQUIRED: 400,
+      BAD_REQUEST: 400,
       INTERNAL_SERVER_ERROR: 500
     },
     TEXTS: {
