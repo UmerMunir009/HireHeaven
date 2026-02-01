@@ -4,6 +4,7 @@ const { generateToken } = require("../../utils/jwtToken");
 const { User } = require("../../models");
 const bcrypt = require("bcrypt");
 const { uploadFromBuffer } = require("../../config/cloudinary");
+const { emitUserSignedUp } = require('../../utils/kafka'); 
 
 const signUpJobSeeker = asyncErrorHandler(async (req, res) => {
   const { email, password, name, phoneNumber } = req.body;
@@ -46,6 +47,8 @@ const signUpJobSeeker = asyncErrorHandler(async (req, res) => {
     resume: resumeResult.secure_url,
     resume_public_id: resumeResult.public_id
   });
+
+  await emitUserSignedUp(newUser);
 
   const userData = newUser.toJSON();
   delete userData.password;
@@ -96,6 +99,8 @@ const signUpRecruiter = asyncErrorHandler(async (req, res) => {
     profile_pic: profileResult.secure_url,
     profile_pic_public_key: profileResult.public_id
   });
+    await emitUserSignedUp(newUser);
+
 
   const userData = newUser.toJSON();
   delete userData.password;
