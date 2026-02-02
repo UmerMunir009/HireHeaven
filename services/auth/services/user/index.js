@@ -3,8 +3,10 @@ const { STATUS_CODES, TEXTS } = require("../../config/constants");
 const { generateToken } = require("../../utils/jwtToken");
 const { User } = require("../../models");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const { uploadFromBuffer } = require("../../config/cloudinary");
-const { emitUserSignedUp } = require('../../utils/kafka'); 
+const { emitUserSignedUp , emitForgotPasswordMail} = require('../../utils/kafka'); 
+const redisClient = require("../../utils/redis");
 
 const signUpJobSeeker = asyncErrorHandler(async (req, res) => {
   const { email, password, name, phoneNumber } = req.body;
@@ -147,8 +149,70 @@ const login = asyncErrorHandler(async (req, res) => {
   });
 });
 
+const forgotPassword = asyncErrorHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ where: { email } });
+  if (!user) {
+    return res.status(STATUS_CODES.NOT_FOUND).json({
+      statusCode: STATUS_CODES.NOT_FOUND,
+      message: "User with this email does not exist.",
+    });
+  }
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  await redisClient.set(`reset:${email}`, resetToken, { EX: 900 });
+  console.log('SET TO CACHEEEEEEEEEEE')
+  //WILL UPDATE UPDATE LATER AND ADD IN .ENV
+  const resetLink = `http://localhost:5173/reset-password?token=${resetToken}&email=${email}`;
+  
+  await emitForgotPasswordMail({
+    email: user.email,
+    name: user.name,
+    resetLink: resetLink
+  });
+
+  res.status(STATUS_CODES.SUCCESS).json({
+    statusCode: STATUS_CODES.SUCCESS,
+    message: "Password reset link sent to your email.",
+  });
+});
+
+
+const resetPassword = asyncErrorHandler(async (req, res) => {
+  const { email, token, newPassword } = req.body;
+
+  if (!email || !token || !newPassword) {
+    return res.status(STATUS_CODES.BAD_REQUEST).json({
+      message: "Email, token, and new password are required.",
+    });
+  }
+
+  const storedToken = await redisClient.get(`reset:${email}`);
+  if (!storedToken || storedToken !== token) {
+    return res.status(STATUS_CODES.UNAUTHORIZED).json({
+      message: "Invalid or expired reset token.",
+    });
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+  await User.update(
+    { password: hashedPassword },
+    { where: { email } }
+  );
+
+  await redisClient.del(`reset:${email}`);
+
+  res.status(STATUS_CODES.SUCCESS).json({
+    message: "Password has been reset successfully. You can now login.",
+  });
+});
 module.exports = {
   signUpJobSeeker,
   signUpRecruiter,
   login,
+  forgotPassword,
+  resetPassword
 };

@@ -5,5 +5,7 @@ const { upload } = require("../../utils/multer");
 router.post("/user/sign-up/job-seeker", upload.fields([  { name: 'profile_pic', maxCount: 1 },  { name: 'resume', maxCount: 1 }]), userServices.signUpJobSeeker);
 router.post("/user/sign-up/recruiter", upload.single('profile_pic'), userServices.signUpRecruiter);
 router.post("/user/login", userServices.login);
+router.post("/user/forgot-password", userServices.forgotPassword);
+router.post("/user/reset-password", userServices.resetPassword);
 
 module.exports = router;

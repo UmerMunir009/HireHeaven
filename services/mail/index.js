@@ -1,8 +1,7 @@
 const { Kafka } = require('kafkajs');
 const nodemailer = require('nodemailer'); 
-const { welcomeEmail } = require('./templates');
+const { welcomeEmail, forgotPasswordEmail } = require('./templates'); 
 require('dotenv').config();
-
 
 const kafka = new Kafka({
   clientId: 'mail-service',
@@ -22,36 +21,49 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 10000
 });
 
-
-
 const consumer = kafka.consumer({ groupId: 'mail-group' });
 
 const run = async () => {
   await consumer.connect();
-  await consumer.subscribe({ topic: 'user-registered', fromBeginning: true });
+  
+  await consumer.subscribe({ topics: ['user-registered', 'forgot-password'], fromBeginning: true });
 
-  console.log("===Mail Service is listening for messages===");
+  console.log("=== Mail Service is listening for Registration & Forgot Password messages ===");
 
   await consumer.run({
-    eachMessage: async ({ message }) => {
+    eachMessage: async ({ topic, message }) => {
       try {
-        const userData = JSON.parse(message.value.toString());
-        const { email, name, role } = userData;
+        const data = JSON.parse(message.value.toString());
+        const { email, name } = data;
         
-        console.log(`Kafka Received: Preparing email for ${email}`);
+        console.log(`✨ Kafka Received [${topic}]: Preparing email for ${email}`);
 
-        const mailOptions = {
+        let mailOptions = {
           from: `"HireHeaven" <${process.env.EMAIL_USER}>`,
           to: email,
-          subject: '✨ Welcome to HireHeaven!',
-          html: welcomeEmail(name, role) 
         };
 
+        switch (topic) {
+          case 'user-registered':
+            mailOptions.subject = '✨ Welcome to HireHeaven!';
+            mailOptions.html = welcomeEmail(name, data.role);
+            break;
+            
+          case 'forgot-password':
+            mailOptions.subject = '🔒 Reset Your HireHeaven Password';
+            mailOptions.html = forgotPasswordEmail(name, data.resetLink);
+            break;
+
+          default:
+            console.warn(`Received message from unknown topic: ${topic}`);
+            return;
+        }
+
         const info = await transporter.sendMail(mailOptions);
-        console.log(` Welcome email sent to ${email}. Response: ${info.response}`);
+        console.log(`✅ Email sent for ${topic} to ${email}. Response: ${info.response}`);
 
       } catch (error) {
-        console.error(` Error in Mail Service:`, error.message);
+        console.error(`Error in Mail Service (${topic}):`, error.message);
       }
     },
   });
